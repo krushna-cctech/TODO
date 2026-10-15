@@ -1,0 +1,448 @@
+from pathlib import Path
+
+content = r'''openapi: 3.0.3
+info:
+  title: TaskFlow TODO API
+  version: 1.0.0
+  description: |
+    REST API for creating and managing TODO items.
+
+    Contract decisions:
+    - TODO IDs are UUIDs.
+    - Valid statuses are `pending`, `in_progress`, and `completed`.
+    - A newly created TODO defaults to `pending` when status is omitted.
+    - List operations use opaque cursor-based pagination, not page numbers or OFFSET.
+    - The maximum page size is 100; the default is 20.
+    - Timestamps are returned as RFC 3339 date-time strings in UTC.
+    - This API specification does not define authentication because no authentication
+      requirement has been selected for the current project.
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+tags:
+  - name: Todos
+    description: Create, retrieve, list, update, and delete TODO items
+  - name: Health
+    description: Application health and readiness checks
+
+paths:
+  /v1/todos:
+    post:
+      tags: [Todos]
+      operationId: createTodo
+      summary: Create a TODO
+      description: Creates a TODO item. If `status` is omitted, it defaults to `pending`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTodoRequest'
+            example:
+              name: Learn Go interfaces
+              status: pending
+      responses:
+        '201':
+          description: TODO created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                name: Learn Go interfaces
+                status: pending
+                created_at: '2026-10-15T15:30:00Z'
+                updated_at: '2026-10-15T15:30:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    get:
+      tags: [Todos]
+      operationId: listTodos
+      summary: List TODOs
+      description: |
+        Returns a bounded page of TODOs in stable ascending order by
+        `(created_at, id)`. The cursor is opaque to clients and must be passed
+        back unchanged. The server may return fewer items than `limit`.
+        `next_cursor` is null when there are no more results.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Number of items to return. Defaults to 20 and is capped at 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor returned by a previous list response.
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: A page of TODOs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoListResponse'
+              example:
+                items:
+                  - id: 550e8400-e29b-41d4-a716-446655440000
+                    name: Learn Go interfaces
+                    status: pending
+                    created_at: '2026-10-15T15:30:00Z'
+                    updated_at: '2026-10-15T15:30:00Z'
+                next_cursor: eyJjcmVhdGVkX2F0IjoiLi4uIiwiaWQiOiIuLi4ifQ
+                has_more: true
+        '400':
+          description: Invalid limit or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidLimit:
+                  value:
+                    error:
+                      code: invalid_limit
+                      message: Limit must be between 1 and 100
+                invalidCursor:
+                  value:
+                    error:
+                      code: invalid_cursor
+                      message: Cursor is invalid
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/todos/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TodoId'
+    get:
+      tags: [Todos]
+      operationId: getTodo
+      summary: Get a TODO by ID
+      responses:
+        '200':
+          description: TODO found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/TodoNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    patch:
+      tags: [Todos]
+      operationId: updateTodo
+      summary: Update a TODO
+      description: |
+        Updates one or more fields. Omitted fields remain unchanged.
+        At least one updatable field must be provided. Explicit null values
+        are not supported.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTodoRequest'
+            examples:
+              updateStatus:
+                value:
+                  status: completed
+              updateName:
+                value:
+                  name: Finish Go API documentation
+              updateBoth:
+                value:
+                  name: Finish and review Go API documentation
+                  status: in_progress
+      responses:
+        '200':
+          description: TODO updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/TodoNotFound'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    delete:
+      tags: [Todos]
+      operationId: deleteTodo
+      summary: Delete a TODO
+      responses:
+        '204':
+          description: TODO deleted successfully; response body is empty
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/TodoNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /health:
+    get:
+      tags: [Health]
+      operationId: healthCheck
+      summary: Check application process health
+      description: Indicates whether the API process is running. This endpoint should not be used alone to decide whether the service can accept traffic.
+      responses:
+        '200':
+          description: Application process is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+
+  /ready:
+    get:
+      tags: [Health]
+      operationId: readinessCheck
+      summary: Check application readiness
+      description: Indicates whether the application is ready to serve requests, including required dependency checks such as MySQL.
+      responses:
+        '200':
+          description: Application is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+              example:
+                status: ready
+        '503':
+          description: Application is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+              example:
+                status: not_ready
+
+components:
+  parameters:
+    TodoId:
+      name: id
+      in: path
+      required: true
+      description: UUID of the TODO item.
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+
+  schemas:
+    TodoStatus:
+      type: string
+      description: Current lifecycle status of the TODO.
+      enum:
+        - pending
+        - in_progress
+        - completed
+      example: pending
+
+    Todo:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Server-generated unique identifier.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Human-readable task name.
+        status:
+          $ref: '#/components/schemas/TodoStatus'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Creation timestamp in UTC.
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Last update timestamp in UTC.
+
+    CreateTodoRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Task name. Whitespace-only names are invalid.
+          example: Learn Go interfaces
+        status:
+          $ref: '#/components/schemas/TodoStatus'
+          description: Initial status. Defaults to `pending` when omitted.
+
+    UpdateTodoRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: New task name. Whitespace-only names are invalid.
+        status:
+          $ref: '#/components/schemas/TodoStatus'
+
+    TodoListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor, has_more]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Todo'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page, or null when there are no more results.
+        has_more:
+          type: boolean
+          description: True when another page is available.
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          example: todo_not_found
+        message:
+          type: string
+          description: Human-readable error message.
+          example: Todo was not found
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/Error'
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    ReadinessResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+
+  responses:
+    BadRequest:
+      description: Request validation failed or the resource ID is invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: invalid_request
+              message: The request is invalid
+
+    TodoNotFound:
+      description: No TODO exists with the supplied ID
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: todo_not_found
+              message: Todo was not found
+
+    UnsupportedMediaType:
+      description: Request Content-Type must be application/json
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: unsupported_media_type
+              message: Content-Type must be application/json
+
+    InternalServerError:
+      description: Unexpected server-side error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: internal_error
+              message: An unexpected error occurred
+
+    ServiceUnavailable:
+      description: A required dependency is unavailable or the service is not ready
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: service_unavailable
+              message: A required dependency is unavailable
+'''
+path = Path("/mnt/data/openapi.yaml")
+path.write_text(content, encoding="utf-8")
+print(f"Created {path} ({len(content.splitlines())} lines)")
