@@ -21,10 +21,6 @@ Table todos {
   due_date datetime
   created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
-
-  indexes {
-    (user_id, completed)
-  }
 }
 
 Ref: todos.user_id > users.id
