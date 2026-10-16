@@ -1,0 +1,93 @@
+
+# ==========================================
+# Go
+# ==========================================
+
+# Compiled binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Build and coverage output
+/bin/
+/build/
+/dist/
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+
+# Go workspace files (ignore only if machine-specific)
+# go.work
+# go.work.sum
+
+# ==========================================
+# Environment variables and secrets
+# ==========================================
+
+.env
+.env.*
+!.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ==========================================
+# Logs and temporary files
+# ==========================================
+
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# ==========================================
+# VS Code
+# ==========================================
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.history/
+*.code-workspace
+
+# ==========================================
+# Windows
+# ==========================================
+
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*.stackdump
+
+# ==========================================
+# Docker and local database data
+# ==========================================
+
+# Local database volumes/data
+mysql-data/
+data/mysql/
+docker-data/
+
+# Local overrides
+docker-compose.override.yml
+
+# ==========================================
+# IDE and OS metadata
+# ==========================================
+
+.idea/
+.DS_Store
