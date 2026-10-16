@@ -1,6 +1,4 @@
-from pathlib import Path
-
-content = r'''openapi: 3.0.3
+openapi: 3.0.3
 info:
   title: TaskFlow TODO API
   version: 1.0.0
@@ -442,7 +440,3 @@ components:
             error:
               code: service_unavailable
               message: A required dependency is unavailable
-'''
-path = Path("/mnt/data/openapi.yaml")
-path.write_text(content, encoding="utf-8")
-print(f"Created {path} ({len(content.splitlines())} lines)")
